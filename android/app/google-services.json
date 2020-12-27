@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "740842074245",
+    "project_id": "nittocat-9eed5",
+    "storage_bucket": "nittocat-9eed5.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:740842074245:android:e147bb84c20d4b25cf79ec",
+        "android_client_info": {
+          "package_name": "com.nittodigital.nittocatadmin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "740842074245-566b751po1bcb5sl04f8ik9br689he95.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfHQJ6evvPzaeYRaxUsbQCQrTKhZ0Sqz8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "740842074245-566b751po1bcb5sl04f8ik9br689he95.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
