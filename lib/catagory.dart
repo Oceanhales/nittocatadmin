@@ -3,7 +3,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nittocatadmin/item.dart';
 import 'package:uuid/uuid.dart';
@@ -63,7 +62,7 @@ class _CategoryPageState extends State<CategoryPage> {
                               MaterialPageRoute(builder: (context) => ItemPage(text: snapshot.data.docs[index]['name'],cUid:snapshot.data.docs[index]['cUid'],)),
                             );
                           },
-                          onLongPress: ()=>showAlertDialog(context,snapshot.data.docs[index]),
+                          onLongPress: ()=>updateAndDeleteBottomSet(context, snapshot.data.docs[index]['cUid'],snapshot.data.docs[index]['imageUrl'], snapshot.data.docs[index]['name']),
                           child: GridTile(
                               child: Padding(
                                 padding: const EdgeInsets.only(top:8.0),
@@ -110,7 +109,51 @@ class _CategoryPageState extends State<CategoryPage> {
       )
     );
   }
-
+  void updateAndDeleteBottomSet(BuildContext context,String uid,String imageSrc,String cName){
+    showModalBottomSheet(
+        context: context,
+        elevation: 10.0,
+        shape:RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30.0),
+        ),
+        builder: (BuildContext context,){
+          return SafeArea(
+            child: Container(
+              child: Wrap(
+                children: [
+                  new ListTile(
+                      leading: new Icon(Icons.edit),
+                      title: new Text('Edit'),
+                      onTap: ()=>Navigator.of(context).push(PageRouteBuilder(
+                          opaque: false,
+                          pageBuilder: (BuildContext context, Animation<double> animation,
+                              Animation<double> secondaryAnimation)=>RotationTransition(
+                            turns: animation,
+                            child: ScaleTransition(
+                              scale: animation,
+                              child: FadeTransition(
+                                  opacity: animation,
+                                  child:PostCategory(cUid: uid,imageUrl: imageSrc,)
+                              ),
+                            ),
+                          )
+                      )).then((value) => setState(() {})
+                      )),
+                  new ListTile(
+                    leading: new Icon(Icons.delete),
+                    title: new Text('Delete'),
+                    onTap: () {
+                      uid!=null?FirebaseFirestore.instance.collection('category').doc(uid).delete()
+                          .whenComplete(() => Navigator.of(context).pop()):print('No uid get');
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+    );
+  }
   Future showAlertDialog(BuildContext context,DocumentSnapshot deleteItem) {
 
     // set up the buttons
@@ -181,15 +224,22 @@ class _CategoryPageState extends State<CategoryPage> {
 
 class PostCategory extends StatefulWidget {
   final String uName;
+  final  String cUid;
+  final String imageUrl;
 
-  const PostCategory({this.uName});
+  const PostCategory({this.uName,this.cUid,this.imageUrl});
 
 
   @override
-  _PostCategoryState createState() => _PostCategoryState();
+  _PostCategoryState createState() => _PostCategoryState(cUid: cUid,uName: uName,imageUrl: imageUrl);
 }
 
 class _PostCategoryState extends State<PostCategory> {
+
+  final String uName;
+  final  String cUid;
+  final String imageUrl;
+
 
   static var uuid = Uuid();
   var uidCategory=uuid.v4(options: {
@@ -201,6 +251,8 @@ class _PostCategoryState extends State<PostCategory> {
 
   File _image;
   String url;
+
+  _PostCategoryState({this.uName, this.cUid, this.imageUrl});
   _imgFromCamera() async {
     File image = await ImagePicker.pickImage(
         source: ImageSource.camera, imageQuality: 50
@@ -242,14 +294,6 @@ class _PostCategoryState extends State<PostCategory> {
     };
     dr.set(task).whenComplete(() => Navigator.of(context).pop());
   }
-  updateCategory()async{
-    Map<String,dynamic>task={
-      'name': UpName,
-      //'imageUrl': UimageUrl,
-      //'cUid':uidCategory,
-      //'items':FieldValue.arrayUnion(_list)
-    };
-  };
   setTxtToEditingController(String name){
     if(name!=null){
       categoryNameController.value=TextEditingValue(text: name);
@@ -260,7 +304,7 @@ class _PostCategoryState extends State<PostCategory> {
   }
   @override
   void initState() {
-    setTxtToEditingController(UpName);
+    setTxtToEditingController(uName);
     super.initState();
   }
 
@@ -299,12 +343,14 @@ class _PostCategoryState extends State<PostCategory> {
                     child: _image != null
                         ? ClipRRect(
                       //borderRadius: BorderRadius.circular(100),
-                      child: Image.file(
+                      child: imageUrl==null?Image.file(
                         _image,
                         width: 200,
                         height: 200,
                         fit: BoxFit.fitHeight,
-                      ),
+                      ):Image.network(imageUrl,width: 200,
+                        height: 200,
+                        fit: BoxFit.fitHeight,)
                     )
                         : Container(
                       decoration: BoxDecoration(
@@ -356,10 +402,16 @@ class _PostCategoryState extends State<PostCategory> {
                     child: Text("Update Item"),
                     onPressed: () {
 
-                      if(imageUrl!=null && itemNameController.text.isNotEmpty && itemPriceController.text.isNotEmpty && itemDescriptionController.text.isNotEmpty){
+                      if(imageUrl!=null && categoryNameController.text.isNotEmpty){
                         print('update');
-                        deleteAndUploadProduct(itemNameController.text.toString(), url!=null?url:imageUrl,
-                            itemPriceController.text.toString(), itemDescriptionController.text.toString());//upload single product firebase array
+                        Map<String,dynamic> task={
+                          'name':categoryNameController.text.toString(),
+                          'imageUrl':imageUrl==null?url:imageUrl,
+                        };
+                        FirebaseFirestore.instance.collection('category').doc(cUid).update(task).whenComplete(() {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).pop();
+                        });
                       }else{
                         print('something Wrong');
                         print(url);
