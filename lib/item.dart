@@ -181,8 +181,6 @@ class _ItemPageState extends State<ItemPage> {
           return SafeArea(
             child: Container(
                 child: ListView(
-                  //mainAxisAlignment: MainAxisAlignment.start,
-                //crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Align(
                     alignment: Alignment.topRight,
