@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nanoid/async/nanoid.dart';
 import 'package:uuid/uuid.dart';
 import 'package:uuid/uuid_util.dart';
 
@@ -43,7 +44,7 @@ class _ItemPageState extends State<ItemPage> {
                   scale: animation,
                   child: FadeTransition(
                     opacity: animation,
-                    child:PostItem(cUid: cUid,)
+                    child:PostItem(cName: text,)
                   ),
                 ),
               )
@@ -51,26 +52,26 @@ class _ItemPageState extends State<ItemPage> {
         ))]
       ),
       body: Container(
-        child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('category').doc(cUid).snapshots(),
-          builder: (BuildContext context,AsyncSnapshot<DocumentSnapshot>snapshot){
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('product').where('category',isEqualTo: text.trim()).snapshots(),
+          builder: (BuildContext context,AsyncSnapshot<QuerySnapshot>snapshot){
             if(snapshot.connectionState==ConnectionState.waiting){
               return Center(child: CircularProgressIndicator(),);
             }else{
               if(snapshot.hasData){
-                List items=snapshot.data['items'];
                 return OrientationBuilder(
                   builder: (_,orientation){
                     return GridView.builder(
-                      itemCount: items.length,
+                      itemCount: snapshot.data.docs.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: (orientation == Orientation.portrait) ? 3 : 4),
                       itemBuilder: (_,index){
                         return GestureDetector(
                           onTap: (){
-                            _productDetails(context,items[index]['pImageUrl'],items[index]['pName'],items[index]['pPrice'],items[index]['pDescription']);
+                            _productDetails(context,snapshot.data.docs[index]['pImageUrl'],snapshot.data.docs[index]['pName'],snapshot.data.docs[index]['pPrice'],snapshot.data.docs[index]['pDescription']);
                           },
-                          onLongPress: ()=>updateAndDeleteBottomSet(context, cUid, items[index]['pImageUrl'], items[index]['pName'], items[index]['pPrice'], items[index]['pDescription']),
+                          onLongPress: ()=>updateAndDeleteBottomSet(context, snapshot.data.docs[index]['pUid'], snapshot.data.docs[index]['pImageUrl'], snapshot.data.docs[index]['pName'],
+                              snapshot.data.docs[index]['pPrice'], snapshot.data.docs[index]['pDescription'],snapshot.data.docs[index]['category']),
                           child: GridTile(
                               child: Padding(
                                 padding: const EdgeInsets.only(top:8.0),
@@ -83,7 +84,7 @@ class _ItemPageState extends State<ItemPage> {
                                       decoration: BoxDecoration(
                                         image: DecorationImage(
                                             fit: BoxFit.fill, image: CachedNetworkImageProvider(
-                                          items[index]['pImageUrl']
+                                            snapshot.data.docs[index]['pImageUrl']
                                         )
                                         ),
                                         borderRadius: BorderRadius.all(Radius.circular(8.0)),
@@ -104,7 +105,7 @@ class _ItemPageState extends State<ItemPage> {
                                       child: Container(
                                         alignment: Alignment.center,
                                         padding: EdgeInsets.all(3),
-                                        child: Center(child: Text(items[index]['pName'],maxLines: 1,)),
+                                        child: Center(child: Text(snapshot.data.docs[index]['pName'],maxLines: 1,)),
                                       ),
                                     ),
                                   ],
@@ -125,7 +126,7 @@ class _ItemPageState extends State<ItemPage> {
       )
     );
   }
- void updateAndDeleteBottomSet(BuildContext context,String uid,String imageSrc,String pName,String pPrice,String pDescription){
+ void updateAndDeleteBottomSet(BuildContext context,String uid,String imageSrc,String pName,String pPrice,String pDescription,String categoryName){
     showModalBottomSheet(
       context: context,
       elevation: 10.0,
@@ -149,7 +150,7 @@ class _ItemPageState extends State<ItemPage> {
                             scale: animation,
                             child: FadeTransition(
                                 opacity: animation,
-                                child:PostItem(cUid: uid,imageUrl: imageSrc,pName: pName,pPrice: pPrice,pDescription: pDescription,)
+                                child:PostItem(cUid: uid,imageUrl: imageSrc,pName: pName,pPrice: pPrice,pDescription: pDescription,cName: categoryName,)
                             ),
                           ),
                         )
@@ -159,18 +160,7 @@ class _ItemPageState extends State<ItemPage> {
                   leading: new Icon(Icons.delete),
                   title: new Text('Delete'),
                   onTap: () {
-                    Map<String,dynamic>removeTask={
-                      'pImageUrl':imageSrc,
-                      'pName':pName,
-                      'pPrice':pPrice,
-                      'pDescription':pDescription,
-                    };
-                    List val=[];
-                    val.add(removeTask);
-                    FirebaseFirestore.instance.collection('category').doc(cUid).update({
-                      'items':FieldValue.arrayRemove(val)
-                    }).whenComplete(() => Navigator.of(context).pop());
-
+                    FirebaseFirestore.instance.collection('category').doc(cUid).delete().whenComplete(() => Navigator.of(context).pop());
                   },
                 ),
               ],
@@ -272,12 +262,13 @@ class PostItem extends StatefulWidget {
   final String pName;
   final String pPrice;
   final String pDescription;
+  final String cName;
 
-  PostItem({this.cUid,this.imageUrl,this.pName,this.pPrice,this.pDescription});
+  PostItem({this.cUid,this.imageUrl,this.pName,this.pPrice,this.pDescription,this.cName});
 
 
   @override
-  _PostItemState createState() => _PostItemState(cUid: cUid,imageUrl: imageUrl,pName: pName,pDescription: pDescription,pPrice: pPrice);
+  _PostItemState createState() => _PostItemState(cUid: cUid,imageUrl: imageUrl,pName: pName,pDescription: pDescription,pPrice: pPrice,cName: cName);
 }
 
 class _PostItemState extends State<PostItem> {
@@ -286,7 +277,8 @@ class _PostItemState extends State<PostItem> {
   final String pName;
   final String pPrice;
   final String pDescription;
-  _PostItemState({this.cUid,this.imageUrl,this.pName,this.pPrice,this.pDescription});
+  final String cName;
+  _PostItemState({this.cUid,this.imageUrl,this.pName,this.pPrice,this.pDescription,this.cName});
 
   static var uuid = Uuid();
   var uidCategory=uuid.v4(options: {
@@ -334,17 +326,20 @@ class _PostItemState extends State<PostItem> {
       });
     });
   }
-  uploadProduct(String pName,String imageUrl,String pPrice,String pDescription)async{
-    DocumentReference dr=FirebaseFirestore.instance.collection('category').doc(cUid);
+  uploadProduct(String pName,String imageUrl,String pPrice,String pDescription,String cName,)async{
+    var productId = await nanoid(10);
+    print(productId);
+    DocumentReference dr=FirebaseFirestore.instance.collection('product').doc(productId);
     Map<String,dynamic>task={
+      'category':cName,
+      'pUid':productId,
       'pImageUrl':imageUrl,
       'pName':pName,
       'pPrice':pPrice,
       'pDescription':pDescription,
+
     };
-    dr.update({
-      'items':FieldValue.arrayUnion([task])
-    }).whenComplete(() => Navigator.of(context).pop());
+    dr.set(task).whenComplete(() => Navigator.of(context).pop());
   }
   deleteAndUploadProduct(String name,String url,String price,String description)async{
     Map<String,dynamic>task={
@@ -498,7 +493,7 @@ class _PostItemState extends State<PostItem> {
                       if(url!=null && itemNameController.text.isNotEmpty && itemPriceController.text.isNotEmpty && itemDescriptionController.text.isNotEmpty){
                         print('not update');
                         uploadProduct(itemNameController.text.toString(), url,
-                            itemPriceController.text.toString(), itemDescriptionController.text.toString());//upload single product firebase array
+                            itemPriceController.text.toString(), itemDescriptionController.text.toString(),cName);//upload single product firebase array
                       }else{
                         print('something Wrong');
                         print(url);
